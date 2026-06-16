@@ -161,4 +161,52 @@ app.get('/api/products/:id', (req, res) => {
   const data = read();
   const product = data.products.find(p => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'Not found' });
-  const artist = data.artists.find(a => a.id ===
+  const artist = data.artists.find(a => a.id === product.artistId);
+  res.json({ ...product, artistName: artist ? artist.name : '' });
+});
+app.post('/api/products', (req, res) => {
+  const data = read();
+  const { artistId, name, description, images, sku, stock } = req.body;
+  if (!artistId || !name) return res.status(400).json({ error: 'artistId and name are required' });
+  const id = artistId + '-' + slug(name) + '-' + Date.now();
+  const product = { id, artistId, name, description: description||'', images: images||[], sku: sku||'', stock: stock !== undefined ? stock : 999 };
+  data.products.push(product); write(data); res.json(product);
+});
+app.put('/api/products/:id', (req, res) => {
+  const data = read();
+  const idx = data.products.findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  data.products[idx] = { ...data.products[idx], ...req.body }; write(data); res.json(data.products[idx]);
+});
+app.delete('/api/products/:id', (req, res) => {
+  const data = read();
+  if (!data.products.find(p => p.id === req.params.id)) return res.status(404).json({ error: 'Not found' });
+  data.products = data.products.filter(p => p.id !== req.params.id); write(data); res.json({ ok: true });
+});
+
+// ── Orders ───────────────────────────────────────────────
+app.get('/api/orders', (req, res) => res.json(read().orders));
+app.post('/api/orders', (req, res) => {
+  const data = read();
+  const order = { id: 'ord-' + Date.now(), createdAt: new Date().toISOString(), ...req.body };
+  data.orders.push(order); write(data); res.json(order);
+});
+app.delete('/api/orders/:id', (req, res) => {
+  const data = read();
+  if (!data.orders.find(o => o.id === req.params.id)) return res.status(404).json({ error: 'Not found' });
+  data.orders = data.orders.filter(o => o.id !== req.params.id); write(data); res.json({ ok: true });
+});
+
+// ── Generate artist page ─────────────────────────────────
+function generateArtistPage(artist) {
+  const templatePath = path.join(ROOT, 'laz-lewis.html');
+  const destPath     = path.join(ROOT, artist.page);
+  if (!fs.existsSync(templatePath)) return;
+  let html = fs.readFileSync(templatePath, 'utf8');
+  html = html.replace(/laz-lewis/g, artist.id)
+             .replace(/Laz Lewis/g, artist.name);
+  fs.writeFileSync(destPath, html);
+}
+
+// ── Start ────────────────────────────────────────────────
+app.listen(PORT, () => console.log(`🚀  Ginko Posters running on http://localhost:${PORT}`));
